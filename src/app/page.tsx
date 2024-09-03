@@ -6,21 +6,27 @@ import axios from 'axios';
 import { Progress } from "@/components/ui/progress";
 import { BiSolidFileJson } from "react-icons/bi";
 import { useToast } from "@/hooks/use-toast";
+import { AiOutlineClose } from "react-icons/ai"; 
+
+interface ApiResponse {
+  x: number;
+  y: number;
+  text: string;
+}
 
 export default function Home() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
-  const {toast} = useToast()
-
-
+  const { toast } = useToast();
+  const [inJson, setInJson] = useState<ApiResponse[]>([]);
 
   const convertPDFintoJSON = async (file: File) => {
     if (!file) {
       toast({
         description: "Please upload file in pdf format",
         variant: "destructive"
-      })
+      });
       return;
     }
 
@@ -28,19 +34,27 @@ export default function Home() {
     formData.append('file', file);
 
     setLoading(true);
+    setProgress(0); // Reset progress
 
     try {
-      const response = await axios.post("https://resume-parser-gules.vercel.app/upload", formData, {
+      const response = await axios.post("https://resume-parser-gules.vercel.app/upload2", formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setProgress(percentCompleted);
+          }
+        },
       });
       console.log('Response:', response.data);
+      setInJson(response?.data?.data);
     } catch (error) {
       toast({
         description: "Something went wrong!",
         variant: "destructive"
-      })
+      });
     } finally {
       setLoading(false);
     }
@@ -60,7 +74,7 @@ export default function Home() {
       toast({
         description: "Please upload file in pdf format",
         variant: "destructive"
-      })
+      });
     }
   };
 
@@ -73,6 +87,12 @@ export default function Home() {
     handleFileUpload(e);
   };
 
+  const handleReset = () => {
+    setPdfFile(null);
+    setInJson([]);
+    setProgress(0);
+  };
+
   return (
     <main className="w-screen h-screen text-slate-600 flex min-h-screen justify-center flex-col items-center p-5 lg:p-24">
       <h1 className="font-extrabold text-4xl mb-10 text-center">Convert PDF into JSON online for free</h1>
@@ -82,14 +102,13 @@ export default function Home() {
           onDragOver={handleDragOver}
           onDrop={handleDrop}
         >
-          {!loading && (
+          {!loading && inJson.length === 0 && (
             <>
               <FaFilePdf className="text-6xl text-orange-600" />
-
               <h4 className="text-xl text-center">Drag and drop your document here to upload</h4>
               <input
                 type="file"
-                accept=".pdf,.doc,.docx,.rtf,.ppt,.pptx,.jpeg,.png,.txt"
+                accept=".pdf"
                 className="hidden"
                 id="file-upload"
                 onChange={handleFileUpload}
@@ -97,16 +116,8 @@ export default function Home() {
               <label htmlFor="file-upload" className="bg-orange-400 text-white py-2 px-4 rounded-lg shadow hover:bg-orange-500 cursor-pointer">
                 Select from device
               </label>
-              <div>
-                {/* {pdfFile && (
-                  <div className="flex flex-col items-center border-2 rounded-sm p-2">
-                    <FaFilePdf className="text-3xl text-red-500" />
-                    <p className="text-xs">{pdfFile.name}</p>
-                  </div>
-                )} */}
-              </div>
               <p className="text-slate-300 text-sm">
-                Up to 100 MB for PDF and up to 25 MB for DOC, DOCX, RTF, PPT, PPTX, JPEG, PNG, or TXT
+                Up to 100 MB for PDF files.
               </p>
             </>
           )}
@@ -119,9 +130,20 @@ export default function Home() {
               </span>
             </div>
           )}
+          {!loading && inJson.length > 0 && (
+            <div className="w-full">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold">Parsed JSON Data</h2>
+                <AiOutlineClose className="text-xl cursor-pointer" onClick={handleReset} />
+              </div>
+              <p className="bg-gray-100 p-4 rounded-md overflow-x-auto max-h-96">
+                {JSON.stringify(inJson)}
+              </p>
+            </div>
+          )}
         </div>
       </div>
-      {!loading && (
+      {!loading && inJson.length === 0 && (
         <div>
           <p className="text-slate-300 text-sm text-center mt-8">
             Note: Integration described on this webpage may temporarily not be available.
@@ -134,4 +156,3 @@ export default function Home() {
     </main>
   );
 }
-
